@@ -1,0 +1,15 @@
+[package]
+name = "slumberd"
+version = "0.1.0"
+authors = ["Naftuli Kay <me@naftuli.wtf>"]
+edition = "2018"
+publish = false
+
+[dependencies]
+actix-web = "1.0"
+log = "0.4"
+log4rs = "0.8.3"
+parking_lot = "0.9"
+structopt = "0.3"
+tokio = "0.1"
+uuid = "0.7"
