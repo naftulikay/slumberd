@@ -1,11 +1,15 @@
 use actix_web::web::Data;
 use actix_web::{Error, HttpResponse};
 
+use crate::config::CliArgs;
+
 use futures::{future, Future};
 
+use serde_json::json;
+
+use std::convert::TryInto;
 use std::time::Duration;
 
-use crate::config::CliArgs;
 use tokio::prelude::FutureExt;
 
 use uuid::Uuid;
@@ -25,10 +29,19 @@ fn sleeper(duration: Duration) -> Box<dyn Future<Item = HttpResponse, Error = Er
 
         log::debug!("{{request_id = {}}} Sending response.", req_id);
 
+        let body = json!({
+            "request-id": req_id,
+            "sleep": {
+                "duration": pretty,
+                "duration-ms": millis,
+            }
+        });
+
         Ok(HttpResponse::Ok()
+            .content_type("application/json")
             .header("X-Request-Id", req_id.to_string())
             .header("X-Sleep-Duration", pretty)
             .header("X-Sleep-Duration-Millis", format!("{}", millis))
-            .finish())
+            .body(serde_json::to_string_pretty(&body)?))
     }))
 }
