@@ -33,10 +33,16 @@ fn init_internal(cli: &CliArgs) {
             .build(),
     );
 
+    let level = match cli.verbosity {
+        0 => LevelFilter::Info,
+        1 => LevelFilter::Debug,
+        _ => LevelFilter::Trace,
+    };
+
     log4rs::init_config(
         Config::builder()
             .appender(Appender::builder().build("stderr", appender))
-            .logger(Logger::builder().build("slumberd", LevelFilter::Info))
+            .logger(Logger::builder().build("slumberd", level))
             .build(Root::builder().appender("stderr").build(LevelFilter::Warn))
             .unwrap(),
     )
