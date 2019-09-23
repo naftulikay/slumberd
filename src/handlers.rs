@@ -20,7 +20,7 @@ use tokio::prelude::FutureExt;
 
 use uuid::Uuid;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SleepKind {
     Fixed,
@@ -69,13 +69,22 @@ fn slumber(
 ) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     let req_id = Uuid::new_v4();
 
-    log::debug!("{{request_id = {}}} Sleeping for {:?}.", req_id, duration);
+    log::debug!(
+        "{{request_id = {}, kind = {:?}}} Sleeping for {:?}.",
+        req_id,
+        kind,
+        duration
+    );
 
     Box::new(
         future::empty::<(), ()>()
             .timeout(duration.clone())
             .then(move |_r| {
-                log::debug!("{{request_id = {}}} Sending response.", req_id);
+                log::debug!(
+                    "{{request_id = {}, kind = {:?}}} Sending response.",
+                    req_id,
+                    kind
+                );
 
                 let resp = SleepResponse::new(&req_id, &duration, SleepKind::Fixed);
 
