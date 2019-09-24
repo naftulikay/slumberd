@@ -31,6 +31,10 @@ fn main() {
     let _s = HttpServer::new(move || {
         App::new()
             .register_data(state.clone())
+            .route(
+                "/random/{min}/{max}",
+                web::to_async(handlers::path::random_range),
+            )
             .route("/random", web::to_async(handlers::path::random))
             .route("/sleep/{millis}", web::to_async(handlers::path::specific))
             .default_service(web::route().to_async(handlers::default))
