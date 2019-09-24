@@ -39,7 +39,7 @@ pub enum SleepKind {
     Random,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 pub struct SleepQueryParams {
     pub min: Option<u64>,
     pub max: Option<u64>,
@@ -53,24 +53,9 @@ type Response = Box<dyn Future<Item = HttpResponse, Error = Error>>;
 pub fn default(req: HttpRequest, data: Data<CliArgs>, query: Query<SleepQueryParams>) -> Response {
     slumber(
         SleepKind::Fixed,
-        extract(
-            req.headers(),
-            SLEEP_TIME_HEADER,
-            query.duration,
-            data.sleep_ms,
-        ),
-        extract(
-            req.headers(),
-            MINIMUM_SLEEP_TIME_HEADER,
-            query.min,
-            data.sleep_ms,
-        ),
-        extract(
-            req.headers(),
-            MAXIMUM_SLEEP_TIME_HEADER,
-            query.max,
-            data.max_sleep_ms,
-        ),
+        extract_duration(req.headers(), &query, &data),
+        extract_min(req.headers(), &query, &data),
+        extract_max(req.headers(), &query, &data),
     )
 }
 
@@ -87,6 +72,31 @@ fn extract(headers: &HeaderMap, name: &str, qs: Option<u64>, default: u64) -> Du
                 .unwrap_or(default),
         ),
     )
+}
+
+/// Extract the minimum sleep time, respecting defined bounds.
+fn extract_min(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
+    extract(
+        headers,
+        MINIMUM_SLEEP_TIME_HEADER,
+        query.min,
+        config.min_sleep_ms,
+    )
+}
+
+/// Extract the maximum sleep time, respecting defined bounds.
+fn extract_max(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
+    extract(
+        headers,
+        MAXIMUM_SLEEP_TIME_HEADER,
+        query.max,
+        config.max_sleep_ms,
+    )
+}
+
+/// Extract the requested sleep duration, respecting defined bounds.
+fn extract_duration(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
+    extract(headers, SLEEP_TIME_HEADER, query.duration, config.sleep_ms)
 }
 
 pub mod path {
@@ -112,18 +122,8 @@ pub mod path {
         query: Query<SleepQueryParams>,
     ) -> Response {
         let (min, max) = (
-            extract(
-                req.headers(),
-                MINIMUM_SLEEP_TIME_HEADER,
-                query.min,
-                data.min_sleep_ms,
-            ),
-            extract(
-                req.headers(),
-                MAXIMUM_SLEEP_TIME_HEADER,
-                query.max,
-                data.max_sleep_ms,
-            ),
+            extract_min(req.headers(), &query, &data),
+            extract_max(req.headers(), &query, &data),
         );
 
         slumber(

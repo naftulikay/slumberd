@@ -6,6 +6,25 @@ use crate::config::CliArgs;
 use actix_web::http::{HeaderMap, HeaderName, HeaderValue};
 use std::time::Duration;
 
+/// Establish that it's not possible to pass minimum sleep durations that are out of bounds.
+#[test]
+fn test_min_safety() {
+    unimplemented!();
+}
+
+/// Establish that it's not possible to pass maximum sleep durations that are out of bounds.
+#[test]
+fn test_max_safety() {
+    unimplemented!();
+}
+
+/// Establish that it's not possible to pass sleep durations that are out of bounds.
+#[test]
+fn test_time_safety() {
+    unimplemented!();
+}
+
+/// Test that extraction of arbitrary durations from query parameters and headers operate in the correct priority.
 #[test]
 fn test_extract() {
     let mut query = SleepQueryParams {
