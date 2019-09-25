@@ -42,7 +42,7 @@ static SLEEP_TIME_MS_HEADER: &'static str = "X-Slumber-Time-Millis";
 
 static SLEEP_KIND_HEADER: &'static str = "X-Slumber-Type";
 
-#[derive(Debug, Serialize)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SleepKind {
     Fixed,
@@ -51,6 +51,7 @@ pub enum SleepKind {
 
 #[derive(Default, Deserialize)]
 pub struct SleepQueryParams {
+    pub kind: Option<SleepKind>,
     pub min: Option<u64>,
     pub max: Option<u64>,
     #[serde(rename = "time")]
@@ -147,22 +148,23 @@ pub fn default(
     data: Data<CliArgs>,
     query: Query<SleepQueryParams>,
 ) -> SlumberFuture {
+    let kind = extract_sleep_kind(req.headers(), &query, &data);
+
     let (min, max) = (
-        extract_min(req.headers(), &query, &data),
-        extract_max(req.headers(), &query, &data),
+        extract_sleep_min_time(req.headers(), &query, &data),
+        extract_sleep_max_time(req.headers(), &query, &data),
     );
 
-    slumber(if data.random {
-        // if we're random by default, do the random
-        SlumberConfig::random(&min, &max, &data)
-    } else {
-        // otherwise just use a fixed time
-        SlumberConfig::fixed(&extract_duration(req.headers(), &query, &data), &data)
+    slumber(match kind {
+        SleepKind::Random => SlumberConfig::random(&min, &max, &data),
+        SleepKind::Fixed => {
+            SlumberConfig::fixed(&extract_sleep_time(req.headers(), &query, &data), &data)
+        }
     })
 }
 
-/// Extract the sleep time using the query string, header value, or the default value in that priority.
-fn extract(headers: &HeaderMap, name: &str, qs: Option<u64>, default: u64) -> Duration {
+/// Extract a duration using a query string value, header value, or the default value in that priority.
+fn extract_duration(headers: &HeaderMap, name: &str, qs: Option<u64>, default: u64) -> Duration {
     Duration::from_millis(
         qs.unwrap_or(
             headers
@@ -176,9 +178,39 @@ fn extract(headers: &HeaderMap, name: &str, qs: Option<u64>, default: u64) -> Du
     )
 }
 
+/// Extract the sleep kind from the query string, the headers, or the configuration default in that priority.
+fn extract_sleep_kind(
+    headers: &HeaderMap,
+    query: &SleepQueryParams,
+    config: &CliArgs,
+) -> SleepKind {
+    let default = if config.random {
+        SleepKind::Random
+    } else {
+        SleepKind::Fixed
+    };
+
+    query.kind.unwrap_or(
+        headers
+            .get(SLEEP_KIND_HEADER)
+            .map(|h| h.to_str())
+            .and_then(|r| r.ok())
+            .map(|s| match s {
+                "fixed" => SleepKind::Fixed,
+                "random" => SleepKind::Random,
+                _ => default,
+            })
+            .unwrap_or(default),
+    )
+}
+
 /// Extract the minimum sleep time, respecting defined bounds.
-fn extract_min(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
-    extract(
+fn extract_sleep_min_time(
+    headers: &HeaderMap,
+    query: &SleepQueryParams,
+    config: &CliArgs,
+) -> Duration {
+    extract_duration(
         headers,
         MINIMUM_SLEEP_TIME_MS_HEADER,
         query.min,
@@ -187,8 +219,12 @@ fn extract_min(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) 
 }
 
 /// Extract the maximum sleep time, respecting defined bounds.
-fn extract_max(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
-    extract(
+fn extract_sleep_max_time(
+    headers: &HeaderMap,
+    query: &SleepQueryParams,
+    config: &CliArgs,
+) -> Duration {
+    extract_duration(
         headers,
         MAXIMUM_SLEEP_TIME_MS_HEADER,
         query.max,
@@ -197,8 +233,8 @@ fn extract_max(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) 
 }
 
 /// Extract the requested sleep duration, respecting defined bounds.
-fn extract_duration(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
-    extract(
+fn extract_sleep_time(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
+    extract_duration(
         headers,
         SLEEP_TIME_MS_HEADER,
         query.duration,
@@ -223,8 +259,8 @@ pub mod path {
         query: Query<SleepQueryParams>,
     ) -> SlumberFuture {
         let (req_min, req_max) = (
-            extract_min(req.headers(), &query, &data),
-            extract_max(req.headers(), &query, &data),
+            extract_sleep_min_time(req.headers(), &query, &data),
+            extract_sleep_max_time(req.headers(), &query, &data),
         );
 
         slumber(SlumberConfig::random(&req_min, &req_max, &data))

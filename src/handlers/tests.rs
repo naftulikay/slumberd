@@ -1,11 +1,14 @@
-use super::extract;
 use super::extract_duration;
-use super::extract_max;
-use super::extract_min;
+use super::extract_sleep_kind;
+use super::extract_sleep_max_time;
+use super::extract_sleep_min_time;
+use super::extract_sleep_time;
 use super::SleepBounds;
+use super::SleepKind;
 use super::SleepQueryParams;
 use super::MAXIMUM_SLEEP_TIME_MS_HEADER;
 use super::MINIMUM_SLEEP_TIME_MS_HEADER;
+use super::SLEEP_KIND_HEADER;
 use super::SLEEP_TIME_MS_HEADER;
 
 use crate::config::CliArgs;
@@ -14,7 +17,7 @@ use actix_web::http::{HeaderMap, HeaderName, HeaderValue};
 use std::time::Duration;
 
 #[test]
-fn test_extract_min() {
+fn test_extract_sleep_min_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
@@ -32,7 +35,7 @@ fn test_extract_min() {
     // test fallback to cli args
     assert_eq!(
         Duration::from_millis(1000),
-        extract_min(&headers, &query, &args)
+        extract_sleep_min_time(&headers, &query, &args)
     );
 
     // test headers
@@ -43,7 +46,7 @@ fn test_extract_min() {
 
     assert_eq!(
         Duration::from_millis(1500),
-        extract_min(&headers, &query, &args)
+        extract_sleep_min_time(&headers, &query, &args)
     );
 
     // test query
@@ -51,12 +54,12 @@ fn test_extract_min() {
 
     assert_eq!(
         Duration::from_millis(1750),
-        extract_min(&headers, &query, &args)
+        extract_sleep_min_time(&headers, &query, &args)
     );
 }
 
 #[test]
-fn test_extract_max() {
+fn test_extract_sleep_max_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
@@ -74,7 +77,7 @@ fn test_extract_max() {
     // test fallback to cli args
     assert_eq!(
         Duration::from_millis(4000),
-        extract_max(&headers, &query, &args)
+        extract_sleep_max_time(&headers, &query, &args)
     );
 
     // test headers
@@ -85,7 +88,7 @@ fn test_extract_max() {
 
     assert_eq!(
         Duration::from_millis(3500),
-        extract_max(&headers, &query, &args)
+        extract_sleep_max_time(&headers, &query, &args)
     );
 
     // test query
@@ -93,12 +96,12 @@ fn test_extract_max() {
 
     assert_eq!(
         Duration::from_millis(3000),
-        extract_max(&headers, &query, &args)
+        extract_sleep_max_time(&headers, &query, &args)
     );
 }
 
 #[test]
-fn test_extract_duration() {
+fn test_extract_sleep_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
@@ -116,7 +119,7 @@ fn test_extract_duration() {
     // test fallback to cli args
     assert_eq!(
         Duration::from_millis(3500),
-        extract_duration(&headers, &query, &args)
+        extract_sleep_time(&headers, &query, &args)
     );
 
     // test headers
@@ -127,7 +130,7 @@ fn test_extract_duration() {
 
     assert_eq!(
         Duration::from_millis(3000),
-        extract_duration(&headers, &query, &args)
+        extract_sleep_time(&headers, &query, &args)
     );
 
     // test query
@@ -135,7 +138,7 @@ fn test_extract_duration() {
 
     assert_eq!(
         Duration::from_millis(2500),
-        extract_duration(&headers, &query, &args)
+        extract_sleep_time(&headers, &query, &args)
     );
 }
 
@@ -159,7 +162,7 @@ fn test_extract() {
     // test fallback to cli args
     assert_eq!(
         Duration::from_millis(1000),
-        extract(
+        extract_duration(
             &headers,
             MINIMUM_SLEEP_TIME_MS_HEADER,
             query.min,
@@ -175,7 +178,7 @@ fn test_extract() {
 
     assert_eq!(
         Duration::from_millis(2000),
-        extract(
+        extract_duration(
             &headers,
             MINIMUM_SLEEP_TIME_MS_HEADER,
             query.min,
@@ -188,12 +191,95 @@ fn test_extract() {
 
     assert_eq!(
         Duration::from_millis(3000),
-        extract(
+        extract_duration(
             &headers,
             MINIMUM_SLEEP_TIME_MS_HEADER,
             query.min,
             args.min_sleep_ms
         )
+    );
+}
+
+#[test]
+fn test_extract_sleep_kind() {
+    let mut query: SleepQueryParams = Default::default();
+    let mut headers = HeaderMap::new();
+
+    let mut args = CliArgs {
+        min_sleep_ms: 1000,
+        max_sleep_ms: 3000,
+        sleep_ms: 2000,
+        verbosity: 0,
+        host: "".to_string(),
+        json: false,
+        port: 8080,
+        random: false,
+    };
+
+    // test defaults
+    assert_eq!(
+        SleepKind::Fixed,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    args.random = true;
+
+    assert_eq!(
+        SleepKind::Random,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    // test headers
+    headers.insert(
+        HeaderName::from_bytes(SLEEP_KIND_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderValue::from_static("fixed"),
+    );
+
+    assert_eq!(
+        SleepKind::Fixed,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    headers.insert(
+        HeaderName::from_bytes(SLEEP_KIND_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderValue::from_static("random"),
+    );
+
+    assert_eq!(
+        SleepKind::Random,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    headers.insert(
+        HeaderName::from_bytes(SLEEP_KIND_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderValue::from_static("unknown"),
+    );
+
+    assert_eq!(
+        SleepKind::Random,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    args.random = false;
+
+    assert_eq!(
+        SleepKind::Fixed,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    // test query string
+    query.kind = Some(SleepKind::Random);
+
+    assert_eq!(
+        SleepKind::Random,
+        extract_sleep_kind(&headers, &query, &args)
+    );
+
+    query.kind = Some(SleepKind::Fixed);
+
+    assert_eq!(
+        SleepKind::Fixed,
+        extract_sleep_kind(&headers, &query, &args)
     );
 }
 
