@@ -4,14 +4,13 @@ use super::extract_max;
 use super::extract_min;
 use super::SleepBounds;
 use super::SleepQueryParams;
-use super::MAXIMUM_SLEEP_TIME_HEADER;
-use super::MINIMUM_SLEEP_TIME_HEADER;
+use super::MAXIMUM_SLEEP_TIME_MS_HEADER;
+use super::MINIMUM_SLEEP_TIME_MS_HEADER;
+use super::SLEEP_TIME_MS_HEADER;
 
 use crate::config::CliArgs;
 
 use actix_web::http::{HeaderMap, HeaderName, HeaderValue};
-
-use crate::handlers::SLEEP_TIME_HEADER;
 use std::time::Duration;
 
 #[test]
@@ -38,7 +37,7 @@ fn test_extract_min() {
 
     // test headers
     headers.insert(
-        HeaderName::from_bytes(&MINIMUM_SLEEP_TIME_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderName::from_bytes(&MINIMUM_SLEEP_TIME_MS_HEADER.to_lowercase().as_bytes()).unwrap(),
         HeaderValue::from_str("1500").unwrap(),
     );
 
@@ -80,7 +79,7 @@ fn test_extract_max() {
 
     // test headers
     headers.insert(
-        HeaderName::from_bytes(&MAXIMUM_SLEEP_TIME_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderName::from_bytes(&MAXIMUM_SLEEP_TIME_MS_HEADER.to_lowercase().as_bytes()).unwrap(),
         HeaderValue::from_static("3500"),
     );
 
@@ -122,7 +121,7 @@ fn test_extract_duration() {
 
     // test headers
     headers.insert(
-        HeaderName::from_bytes(&SLEEP_TIME_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderName::from_bytes(&SLEEP_TIME_MS_HEADER.to_lowercase().as_bytes()).unwrap(),
         HeaderValue::from_static("3000"),
     );
 
@@ -162,7 +161,7 @@ fn test_extract() {
         Duration::from_millis(1000),
         extract(
             &headers,
-            MINIMUM_SLEEP_TIME_HEADER,
+            MINIMUM_SLEEP_TIME_MS_HEADER,
             query.min,
             args.min_sleep_ms
         )
@@ -170,7 +169,7 @@ fn test_extract() {
 
     // test fallback to header
     headers.insert(
-        HeaderName::from_bytes(MINIMUM_SLEEP_TIME_HEADER.to_lowercase().as_bytes()).unwrap(),
+        HeaderName::from_bytes(MINIMUM_SLEEP_TIME_MS_HEADER.to_lowercase().as_bytes()).unwrap(),
         HeaderValue::from_static("2000"),
     );
 
@@ -178,7 +177,7 @@ fn test_extract() {
         Duration::from_millis(2000),
         extract(
             &headers,
-            MINIMUM_SLEEP_TIME_HEADER,
+            MINIMUM_SLEEP_TIME_MS_HEADER,
             query.min,
             args.min_sleep_ms
         )
@@ -191,7 +190,7 @@ fn test_extract() {
         Duration::from_millis(3000),
         extract(
             &headers,
-            MINIMUM_SLEEP_TIME_HEADER,
+            MINIMUM_SLEEP_TIME_MS_HEADER,
             query.min,
             args.min_sleep_ms
         )

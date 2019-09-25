@@ -81,7 +81,7 @@ impl SlumberConfig {
 
     /// Generate a random slumber using the bounds specified.
     fn random(req_min: &Duration, req_max: &Duration, config: &CliArgs) -> Self {
-        // avoid multiple allocations by preallocating
+        // avoid multiple allocations
         let (cfg_min, cfg_max) = (config.min_sleep(), config.max_sleep());
 
         // pre-calculate these
@@ -180,7 +180,7 @@ fn extract(headers: &HeaderMap, name: &str, qs: Option<u64>, default: u64) -> Du
 fn extract_min(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
     extract(
         headers,
-        MINIMUM_SLEEP_TIME_HEADER,
+        MINIMUM_SLEEP_TIME_MS_HEADER,
         query.min,
         config.min_sleep_ms,
     )
@@ -190,7 +190,7 @@ fn extract_min(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) 
 fn extract_max(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
     extract(
         headers,
-        MAXIMUM_SLEEP_TIME_HEADER,
+        MAXIMUM_SLEEP_TIME_MS_HEADER,
         query.max,
         config.max_sleep_ms,
     )
@@ -198,7 +198,12 @@ fn extract_max(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) 
 
 /// Extract the requested sleep duration, respecting defined bounds.
 fn extract_duration(headers: &HeaderMap, query: &SleepQueryParams, config: &CliArgs) -> Duration {
-    extract(headers, SLEEP_TIME_HEADER, query.duration, config.sleep_ms)
+    extract(
+        headers,
+        SLEEP_TIME_MS_HEADER,
+        query.duration,
+        config.sleep_ms,
+    )
 }
 
 pub mod path {
@@ -257,15 +262,28 @@ fn slumber(config: SlumberConfig) -> Box<dyn Future<Item = HttpResponse, Error =
                 );
 
                 // generate json response
-                let payload = SleepResponse::new(&config.id, &config.duration, config.kind);
+                let payload = match config.kind {
+                    SleepKind::Fixed => {
+                        SleepResponse::builder(&config.id, config.kind, &config.duration).build()
+                    }
+                    SleepKind::Random => {
+                        SleepResponse::builder(&config.id, config.kind, &config.duration)
+                            .min(&config.min)
+                            .max(&config.max)
+                            .build()
+                    }
+                };
 
                 let mut response = HttpResponse::Ok();
 
                 response
                     .content_type("application/json")
                     .header(REQUEST_ID_HEADER, config.id.to_string())
-                    .header(SLEEP_TIME_HEADER, payload.duration.pretty.as_str())
-                    .header(SLEEP_TIME_MS_HEADER, format!("{}", payload.duration.millis));
+                    .header(SLEEP_TIME_HEADER, payload.duration.duration_pretty.as_str())
+                    .header(
+                        SLEEP_TIME_MS_HEADER,
+                        format!("{}", payload.duration.duration_millis),
+                    );
 
                 match &payload.duration.kind {
                     SleepKind::Random => {
