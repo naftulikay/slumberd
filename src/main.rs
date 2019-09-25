@@ -35,8 +35,14 @@ fn main() {
                 "/random/{min}/{max}",
                 web::to_async(handlers::path::random_range),
             )
+            .route(
+                "/random/{min}/{max}/",
+                web::to_async(handlers::path::random_range),
+            )
             .route("/random", web::to_async(handlers::path::random))
+            .route("/random/", web::to_async(handlers::path::random))
             .route("/sleep/{millis}", web::to_async(handlers::path::specific))
+            .route("/sleep/{millis}/", web::to_async(handlers::path::specific))
             .default_service(web::route().to_async(handlers::default))
     })
     .bind(bind_addr)
