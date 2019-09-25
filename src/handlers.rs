@@ -11,7 +11,7 @@ use crate::config::CliArgs;
 
 use futures::{future, Future};
 
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 
 use self::response::SleepResponse;
 
@@ -47,16 +47,108 @@ pub struct SleepQueryParams {
     pub duration: Option<u64>,
 }
 
-/// The response type returned by slumber requests.
-type Response = Box<dyn Future<Item = HttpResponse, Error = Error>>;
+struct SlumberConfig {
+    id: Uuid,
+    kind: SleepKind,
+    min: Duration,
+    max: Duration,
+    duration: Duration,
+}
 
-pub fn default(req: HttpRequest, data: Data<CliArgs>, query: Query<SleepQueryParams>) -> Response {
-    slumber(
-        SleepKind::Fixed,
-        extract_duration(req.headers(), &query, &data),
+impl SlumberConfig {
+    /// Generate a fixed-time slumber.
+    fn fixed(req: &Duration, config: &CliArgs) -> Self {
+        let (min, max) = (config.min_sleep(), config.max_sleep());
+
+        Self {
+            id: Uuid::new_v4(),
+            kind: SleepKind::Fixed,
+            min,
+            max,
+            duration: SleepBounds::duration(req, &min, &max),
+        }
+    }
+
+    /// Generate a random slumber using the bounds specified.
+    fn random(req_min: &Duration, req_max: &Duration, config: &CliArgs) -> Self {
+        // avoid multiple allocations by preallocating
+        let (cfg_min, cfg_max) = (config.min_sleep(), config.max_sleep());
+
+        // pre-calculate these
+        let (min, max) = (
+            SleepBounds::min(&req_min, &req_max, &cfg_min, &cfg_max),
+            SleepBounds::max(&req_min, &req_max, &cfg_min, &cfg_max),
+        );
+
+        Self {
+            id: Uuid::new_v4(),
+            kind: SleepKind::Random,
+            min,
+            max,
+            duration: thread_rng().gen_range(min, max),
+        }
+    }
+}
+
+struct SleepBounds;
+
+impl SleepBounds {
+    fn duration(req: &Duration, min: &Duration, max: &Duration) -> Duration {
+        // enforce the duration being >= the minimum and <= the maximum
+        req.max(min).min(max).clone()
+    }
+
+    fn max(
+        req_min: &Duration,
+        req_max: &Duration,
+        config_min: &Duration,
+        config_max: &Duration,
+    ) -> Duration {
+        // set the lower bound to the highest lower constraint
+        let lower = req_min.max(config_min);
+        // set the upper bound to the lowest upper constraint
+        let upper = req_max.min(config_max);
+
+        // choose the largest bound between the lower and upper bounds
+        lower.max(upper).clone()
+    }
+
+    fn min(
+        req_min: &Duration,
+        req_max: &Duration,
+        config_min: &Duration,
+        config_max: &Duration,
+    ) -> Duration {
+        // set the lower bound to the highest lower constraint
+        let lower = req_min.max(config_min);
+        // set the upper bound to the lowest upper constraint
+        let upper = req_max.min(config_max);
+
+        // choose the smallest bound between the lower and upper bounds
+        lower.min(upper).clone()
+    }
+}
+
+/// The response type returned by slumber requests.
+type SlumberFuture = Box<dyn Future<Item = HttpResponse, Error = Error>>;
+
+pub fn default(
+    req: HttpRequest,
+    data: Data<CliArgs>,
+    query: Query<SleepQueryParams>,
+) -> SlumberFuture {
+    let (min, max) = (
         extract_min(req.headers(), &query, &data),
         extract_max(req.headers(), &query, &data),
-    )
+    );
+
+    slumber(if data.random {
+        // if we're random by default, do the random
+        SlumberConfig::random(&min, &max, &data)
+    } else {
+        // otherwise just use a fixed time
+        SlumberConfig::fixed(&extract_duration(req.headers(), &query, &data), &data)
+    })
 }
 
 /// Extract the sleep time using the query string, header value, or the default value in that priority.
@@ -101,18 +193,12 @@ fn extract_duration(headers: &HeaderMap, query: &SleepQueryParams, config: &CliA
 
 pub mod path {
     use super::*;
-    use rand::Rng;
 
     /// Sleep for a specific, path-specified amount of milliseconds.
     ///
     /// The maximum value will be gated to respect the CLI-specified maximum delay value to prevent DoS-like attacks.
-    pub fn specific(data: Data<CliArgs>, millis: Path<u64>) -> Response {
-        slumber(
-            SleepKind::Fixed,
-            Duration::from_millis(*millis).min(data.max_sleep()),
-            data.min_sleep(),
-            data.max_sleep(),
-        )
+    pub fn specific(data: Data<CliArgs>, millis: Path<u64>) -> SlumberFuture {
+        slumber(SlumberConfig::fixed(&Duration::from_millis(*millis), &data))
     }
 
     /// Sleep for a random amount of milliseconds within the CLI-specified minimum and maximum ranges.
@@ -120,73 +206,80 @@ pub mod path {
         req: HttpRequest,
         data: Data<CliArgs>,
         query: Query<SleepQueryParams>,
-    ) -> Response {
-        let (min, max) = (
+    ) -> SlumberFuture {
+        let (req_min, req_max) = (
             extract_min(req.headers(), &query, &data),
             extract_max(req.headers(), &query, &data),
         );
 
-        slumber(
-            SleepKind::Random,
-            thread_rng().gen_range(min, max),
-            min,
-            max,
-        )
+        slumber(SlumberConfig::random(&req_min, &req_max, &data))
     }
 
     /// Sleep for a random amount of milliseconds within the specified range.
     ///
     /// The maximum sleep time will be gated to the CLI-specified maximum delay value to prevent DoS-like attacks.
-    pub fn random_range(data: Data<CliArgs>, range: Path<(u64, u64)>) -> Response {
-        // transform min and max into durations, gating the upper bound to the maximum sleep time
-        let (min, max) = (
-            Duration::from_millis(range.0),
-            data.max_sleep().min(Duration::from_millis(range.1)),
-        );
-
-        let duration = thread_rng().gen_range(min, max);
-
-        slumber(SleepKind::Random, duration, min, max)
+    pub fn random_range(data: Data<CliArgs>, range: Path<(u64, u64)>) -> SlumberFuture {
+        slumber(SlumberConfig::random(
+            &Duration::from_millis(range.0),
+            &Duration::from_millis(range.1),
+            &data,
+        ))
     }
 }
 
 /// Serve a sleepy request.
-fn slumber(
-    kind: SleepKind,
-    duration: Duration,
-    _min: Duration,
-    _max: Duration,
-) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
-    let req_id = Uuid::new_v4();
-
+fn slumber(config: SlumberConfig) -> Box<dyn Future<Item = HttpResponse, Error = Error>> {
     log::debug!(
         "{{request_id = {}, kind = {:?}}} Sleeping for {:?}.",
-        req_id,
-        kind,
-        duration
+        config.id,
+        config.kind,
+        config.duration,
     );
 
     Box::new(
         future::empty::<(), ()>()
-            .timeout(duration.clone())
+            .timeout(config.duration.clone())
             .then(move |_r| {
                 log::debug!(
                     "{{request_id = {}, kind = {:?}}} Sending response.",
-                    req_id,
-                    kind
+                    config.id,
+                    config.kind,
                 );
 
-                let resp = SleepResponse::new(&req_id, &duration, SleepKind::Fixed);
+                // generate json response
+                let payload = SleepResponse::new(&config.id, &config.duration, config.kind);
 
-                Ok(HttpResponse::Ok()
+                let mut response = HttpResponse::Ok();
+
+                response
                     .content_type("application/json")
-                    .header("X-Request-Id", req_id.to_string())
-                    .header("X-Sleep-Duration", resp.duration.pretty.as_str())
+                    .header("X-Request-Id", config.id.to_string())
+                    .header("X-Slumber-Time", payload.duration.pretty.as_str())
                     .header(
-                        "X-Sleep-Duration-Millis",
-                        format!("{}", resp.duration.millis),
-                    )
-                    .body(serde_json::to_string_pretty(&resp)?))
+                        "X-Slumber-Time-Millis",
+                        format!("{}", payload.duration.millis),
+                    );
+
+                match &payload.duration.kind {
+                    SleepKind::Random => {
+                        response.header("X-Slumber-Type", "random");
+                        response.header("X-Slumber-Min-Time", format!("{:?}", config.min));
+                        response.header(
+                            "X-Slumber-Min-Time-Millis",
+                            format!("{}", config.min.as_millis()),
+                        );
+                        response.header("X-Slumber-Max-Time", format!("{:?}", config.max));
+                        response.header(
+                            "X-Slumber-Max-Time-Millis",
+                            format!("{}", config.max.as_millis()),
+                        );
+                    }
+                    SleepKind::Fixed => {
+                        response.header("X-Slumber-Type", "fixed");
+                    }
+                };
+
+                Ok(response.body(serde_json::to_string_pretty(&payload)?))
             }),
     )
 }
