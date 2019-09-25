@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use std::path::PathBuf;
 use structopt::StructOpt;
 
 #[derive(StructOpt)]
@@ -32,10 +33,39 @@ pub struct CliArgs {
     /// This random duration will be selected between the minimum and maximum sleep times.
     #[structopt(short = "r", long = "random")]
     pub random: bool,
+    /// Enable TLS support via rustls. A TLS certificate and private key must be passed if TLS is enabled.
+    #[structopt(long = "tls")]
+    pub tls: bool,
+    /// A path to a TLS certificate chain to use in TLS mode. The certificate chain should be in descending order,
+    /// such that the root CA is the very last certificate in the file and the server certificate is the very first
+    /// certificate in the file.
+    #[structopt(long = "certificate")]
+    pub certificate: Option<PathBuf>,
+    /// A path to a private key to use in TLS mode.
+    #[structopt(long = "private-key")]
+    pub private_key: Option<PathBuf>,
     /// Logging verbosity. By default, only INFO and above are logged. Pass once to increase
     /// verbosity to DEBUG, twice for TRACE.
     #[structopt(short = "v", parse(from_occurrences))]
     pub verbosity: u64,
+}
+
+impl Default for CliArgs {
+    fn default() -> Self {
+        Self {
+            sleep_ms: 5000,
+            host: "127.0.0.1".to_string(),
+            port: 8080,
+            json: false,
+            min_sleep_ms: 15,
+            max_sleep_ms: 30000,
+            random: false,
+            tls: false,
+            certificate: None,
+            private_key: None,
+            verbosity: 0,
+        }
+    }
 }
 
 impl CliArgs {
