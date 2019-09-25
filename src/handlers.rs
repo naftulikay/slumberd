@@ -28,9 +28,19 @@ use uuid::Uuid;
 
 static MINIMUM_SLEEP_TIME_HEADER: &'static str = "X-Slumber-Min-Time";
 
+static MINIMUM_SLEEP_TIME_MS_HEADER: &'static str = "X-Slumber-Min-Time-Millis";
+
 static MAXIMUM_SLEEP_TIME_HEADER: &'static str = "X-Slumber-Max-Time";
 
+static MAXIMUM_SLEEP_TIME_MS_HEADER: &'static str = "X-Slumber-Max-Time-Millis";
+
+static REQUEST_ID_HEADER: &'static str = "X-Request-Id";
+
 static SLEEP_TIME_HEADER: &'static str = "X-Slumber-Time";
+
+static SLEEP_TIME_MS_HEADER: &'static str = "X-Slumber-Time-Millis";
+
+static SLEEP_KIND_HEADER: &'static str = "X-Slumber-Type";
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -253,29 +263,26 @@ fn slumber(config: SlumberConfig) -> Box<dyn Future<Item = HttpResponse, Error =
 
                 response
                     .content_type("application/json")
-                    .header("X-Request-Id", config.id.to_string())
-                    .header("X-Slumber-Time", payload.duration.pretty.as_str())
-                    .header(
-                        "X-Slumber-Time-Millis",
-                        format!("{}", payload.duration.millis),
-                    );
+                    .header(REQUEST_ID_HEADER, config.id.to_string())
+                    .header(SLEEP_TIME_HEADER, payload.duration.pretty.as_str())
+                    .header(SLEEP_TIME_MS_HEADER, format!("{}", payload.duration.millis));
 
                 match &payload.duration.kind {
                     SleepKind::Random => {
-                        response.header("X-Slumber-Type", "random");
-                        response.header("X-Slumber-Min-Time", format!("{:?}", config.min));
+                        response.header(SLEEP_KIND_HEADER, "random");
+                        response.header(MINIMUM_SLEEP_TIME_HEADER, format!("{:?}", config.min));
                         response.header(
-                            "X-Slumber-Min-Time-Millis",
+                            MINIMUM_SLEEP_TIME_MS_HEADER,
                             format!("{}", config.min.as_millis()),
                         );
-                        response.header("X-Slumber-Max-Time", format!("{:?}", config.max));
+                        response.header(MAXIMUM_SLEEP_TIME_HEADER, format!("{:?}", config.max));
                         response.header(
-                            "X-Slumber-Max-Time-Millis",
+                            MAXIMUM_SLEEP_TIME_MS_HEADER,
                             format!("{}", config.max.as_millis()),
                         );
                     }
                     SleepKind::Fixed => {
-                        response.header("X-Slumber-Type", "fixed");
+                        response.header(SLEEP_KIND_HEADER, "fixed");
                     }
                 };
 
