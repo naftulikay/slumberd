@@ -41,7 +41,9 @@ pub struct CliArgs {
 impl CliArgs {
     /// The default sleep duration.
     pub fn sleep(&self) -> Duration {
-        Duration::from_millis(self.sleep_ms)
+        let (min, max) = (self.min_sleep(), self.max_sleep());
+
+        Duration::from_millis(self.sleep_ms).min(max).max(min)
     }
 
     /// The minimum allowed sleep duration.

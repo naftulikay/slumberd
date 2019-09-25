@@ -13,6 +13,26 @@ fn main() {
     // setup logging real quick
     logging::init(&cli);
 
+    // log a warning if bounds are violated
+    if cli.min_sleep_ms > cli.max_sleep_ms {
+        log::warn!(
+            "Minimum sleep time ({}ms) is greater than maximum sleep time ({}ms), normalizing to {:?}.",
+            cli.min_sleep_ms,
+            cli.max_sleep_ms,
+            cli.min_sleep(),
+        );
+    }
+
+    if cli.sleep_ms < cli.min_sleep_ms || cli.sleep_ms > cli.max_sleep_ms {
+        log::warn!(
+            "Sleep time ({}ms) is outside of minimum/maximum range ({:?}-{:?}), normalizing to {:?}.",
+            cli.sleep_ms,
+            cli.min_sleep(),
+            cli.max_sleep(),
+            cli.sleep()
+        );
+    }
+
     let bind_addr = format!("{}:{}", cli.host, cli.port);
 
     log::info!(
