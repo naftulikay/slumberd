@@ -46,11 +46,25 @@ impl CliArgs {
 
     /// The minimum allowed sleep duration.
     pub fn min_sleep(&self) -> Duration {
-        Duration::from_millis(self.min_sleep_ms)
+        // prevent footshot: minimum must always be less than or equal to maximum, this will prevent user error on
+        // the command-line
+        let (min, max) = (
+            Duration::from_millis(self.min_sleep_ms),
+            Duration::from_millis(self.max_sleep_ms),
+        );
+
+        min.min(max)
     }
 
     /// The maximum allowed sleep duration.
     pub fn max_sleep(&self) -> Duration {
-        Duration::from_millis(self.max_sleep_ms)
+        // prevent footshot: maximum must always be greater than or equal to minimum, this will prevent user error on
+        // the command-line
+        let (min, max) = (
+            Duration::from_millis(self.min_sleep_ms),
+            Duration::from_millis(self.max_sleep_ms),
+        );
+
+        max.max(min)
     }
 }
