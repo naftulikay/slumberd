@@ -69,6 +69,11 @@ impl Default for CliArgs {
 }
 
 impl CliArgs {
+    /// Get the listen address.
+    pub fn listen_addr(&self) -> String {
+        format!("{}:{}", self.host, self.port)
+    }
+
     /// The default sleep duration.
     pub fn sleep(&self) -> Duration {
         let (min, max) = (self.min_sleep(), self.max_sleep());
