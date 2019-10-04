@@ -20,17 +20,9 @@ use std::time::Duration;
 fn test_extract_sleep_min_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
+    let mut args = CliArgs::default();
 
-    let args = CliArgs {
-        min_sleep_ms: 1000,
-        max_sleep_ms: 3000,
-        sleep_ms: 2000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    args.min_sleep_ms = 1000;
 
     // test fallback to cli args
     assert_eq!(
@@ -62,17 +54,9 @@ fn test_extract_sleep_min_time() {
 fn test_extract_sleep_max_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
+    let mut args: CliArgs = CliArgs::default();
 
-    let args = CliArgs {
-        min_sleep_ms: 2000,
-        max_sleep_ms: 4000,
-        sleep_ms: 3000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    args.max_sleep_ms = 4000;
 
     // test fallback to cli args
     assert_eq!(
@@ -104,17 +88,9 @@ fn test_extract_sleep_max_time() {
 fn test_extract_sleep_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
+    let mut args = CliArgs::default();
 
-    let args = CliArgs {
-        min_sleep_ms: 2000,
-        max_sleep_ms: 5000,
-        sleep_ms: 3500,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    args.sleep_ms = 3500;
 
     // test fallback to cli args
     assert_eq!(
@@ -147,17 +123,9 @@ fn test_extract_sleep_time() {
 fn test_extract() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
+    let mut args = CliArgs::default();
 
-    let args = CliArgs {
-        min_sleep_ms: 1000,
-        max_sleep_ms: 3000,
-        sleep_ms: 2000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    args.min_sleep_ms = 1000;
 
     // test fallback to cli args
     assert_eq!(
@@ -205,16 +173,7 @@ fn test_extract_sleep_kind() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
-    let mut args = CliArgs {
-        min_sleep_ms: 1000,
-        max_sleep_ms: 3000,
-        sleep_ms: 2000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    let mut args = CliArgs::default();
 
     // test defaults
     assert_eq!(
