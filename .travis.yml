@@ -1,0 +1,35 @@
+---
+dist: bionic
+
+language: rust
+cache: cargo
+rust:
+  - stable
+  - beta
+  - nightly
+
+matrix:
+  allow_failures:
+    - rust: nightly
+  fast_finish: true
+
+addons:
+  apt:
+    packages:
+      - musl
+      - musl-dev
+      - musl-tools
+
+install:
+  - rustup target add x86_64-unknown-linux-musl
+  - cargo install --force cargo-audit
+
+script:
+  - cargo audit
+  - cargo test
+  - cargo build --release --target x86_64-unknown-linux-musl
+
+notifications:
+  email:
+    on_success: never
+    on_failure: never

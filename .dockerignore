@@ -1,0 +1,7 @@
+.ansible/
+.travis.yml
+.vagrant/
+Cargo.lock
+LICENSE-*
+README.md
+target/

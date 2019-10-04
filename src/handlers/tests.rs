@@ -4,8 +4,8 @@ use super::extract_sleep_max_time;
 use super::extract_sleep_min_time;
 use super::extract_sleep_time;
 use super::SleepBounds;
-use super::SleepKind;
 use super::SleepQueryParams;
+use super::SlumberKind;
 use super::MAXIMUM_SLEEP_TIME_MS_HEADER;
 use super::MINIMUM_SLEEP_TIME_MS_HEADER;
 use super::SLEEP_KIND_HEADER;
@@ -21,16 +21,8 @@ fn test_extract_sleep_min_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
-    let args = CliArgs {
-        min_sleep_ms: 1000,
-        max_sleep_ms: 3000,
-        sleep_ms: 2000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    let mut args = CliArgs::default();
+    args.min_sleep_ms = 1000;
 
     // test fallback to cli args
     assert_eq!(
@@ -63,16 +55,8 @@ fn test_extract_sleep_max_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
-    let args = CliArgs {
-        min_sleep_ms: 2000,
-        max_sleep_ms: 4000,
-        sleep_ms: 3000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    let mut args = CliArgs::default();
+    args.max_sleep_ms = 4000;
 
     // test fallback to cli args
     assert_eq!(
@@ -105,16 +89,8 @@ fn test_extract_sleep_time() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
-    let args = CliArgs {
-        min_sleep_ms: 2000,
-        max_sleep_ms: 5000,
-        sleep_ms: 3500,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    let mut args = CliArgs::default();
+    args.sleep_ms = 3500;
 
     // test fallback to cli args
     assert_eq!(
@@ -148,16 +124,8 @@ fn test_extract() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
-    let args = CliArgs {
-        min_sleep_ms: 1000,
-        max_sleep_ms: 3000,
-        sleep_ms: 2000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    let mut args = CliArgs::default();
+    args.min_sleep_ms = 1000;
 
     // test fallback to cli args
     assert_eq!(
@@ -205,27 +173,18 @@ fn test_extract_sleep_kind() {
     let mut query: SleepQueryParams = Default::default();
     let mut headers = HeaderMap::new();
 
-    let mut args = CliArgs {
-        min_sleep_ms: 1000,
-        max_sleep_ms: 3000,
-        sleep_ms: 2000,
-        verbosity: 0,
-        host: "".to_string(),
-        json: false,
-        port: 8080,
-        random: false,
-    };
+    let mut args = CliArgs::default();
 
     // test defaults
     assert_eq!(
-        SleepKind::Fixed,
+        SlumberKind::Fixed,
         extract_sleep_kind(&headers, &query, &args)
     );
 
     args.random = true;
 
     assert_eq!(
-        SleepKind::Random,
+        SlumberKind::Random,
         extract_sleep_kind(&headers, &query, &args)
     );
 
@@ -236,7 +195,7 @@ fn test_extract_sleep_kind() {
     );
 
     assert_eq!(
-        SleepKind::Fixed,
+        SlumberKind::Fixed,
         extract_sleep_kind(&headers, &query, &args)
     );
 
@@ -246,7 +205,7 @@ fn test_extract_sleep_kind() {
     );
 
     assert_eq!(
-        SleepKind::Random,
+        SlumberKind::Random,
         extract_sleep_kind(&headers, &query, &args)
     );
 
@@ -256,29 +215,29 @@ fn test_extract_sleep_kind() {
     );
 
     assert_eq!(
-        SleepKind::Random,
+        SlumberKind::Random,
         extract_sleep_kind(&headers, &query, &args)
     );
 
     args.random = false;
 
     assert_eq!(
-        SleepKind::Fixed,
+        SlumberKind::Fixed,
         extract_sleep_kind(&headers, &query, &args)
     );
 
     // test query string
-    query.kind = Some(SleepKind::Random);
+    query.kind = Some(SlumberKind::Random);
 
     assert_eq!(
-        SleepKind::Random,
+        SlumberKind::Random,
         extract_sleep_kind(&headers, &query, &args)
     );
 
-    query.kind = Some(SleepKind::Fixed);
+    query.kind = Some(SlumberKind::Fixed);
 
     assert_eq!(
-        SleepKind::Fixed,
+        SlumberKind::Fixed,
         extract_sleep_kind(&headers, &query, &args)
     );
 }

@@ -43,6 +43,9 @@ fn main() {
         cli.random,
     );
 
+    // establish a maximum shutdown timeout based on the maximum sleep duration
+    let shutdown_timeout = cli.max_sleep().as_secs_f64().ceil() as u64;
+
     // let's rock and fucking roll
     log::info!("Listening on {}.", bind_addr);
 
@@ -51,6 +54,12 @@ fn main() {
     let _s = HttpServer::new(move || {
         App::new()
             .register_data(state.clone())
+            // provide help via http
+            .route("/_help", web::route().to(handlers::help))
+            .route("/_help/", web::route().to(handlers::help))
+            .route("/_usage", web::route().to(handlers::help))
+            .route("/_usage/", web::route().to(handlers::help))
+            // path-specified random
             .route(
                 "/random/{min}/{max}",
                 web::to_async(handlers::path::random_range),
@@ -59,12 +68,16 @@ fn main() {
                 "/random/{min}/{max}/",
                 web::to_async(handlers::path::random_range),
             )
+            // default random
             .route("/random", web::to_async(handlers::path::random))
             .route("/random/", web::to_async(handlers::path::random))
+            // specific sleep time
             .route("/sleep/{millis}", web::to_async(handlers::path::specific))
             .route("/sleep/{millis}/", web::to_async(handlers::path::specific))
+            // catch-all
             .default_service(web::route().to_async(handlers::default))
     })
+    .shutdown_timeout(shutdown_timeout)
     .bind(bind_addr)
     .unwrap()
     .run()
