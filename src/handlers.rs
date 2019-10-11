@@ -13,7 +13,7 @@ use futures::{future, Future};
 
 use rand::{thread_rng, Rng};
 
-use self::response::SleepResponse;
+use self::response::SlumberResponse;
 
 use serde::Deserialize;
 use serde::Serialize;
@@ -23,7 +23,7 @@ use std::time::Duration;
 
 use tokio::prelude::FutureExt;
 
-use actix_web::http::HeaderMap;
+use actix_web::http::{HeaderMap, StatusCode};
 use uuid::Uuid;
 
 static MINIMUM_SLEEP_TIME_HEADER: &'static str = "X-Slumber-Min-Time";
@@ -42,16 +42,20 @@ static SLEEP_TIME_MS_HEADER: &'static str = "X-Slumber-Time-Millis";
 
 static SLEEP_KIND_HEADER: &'static str = "X-Slumber-Type";
 
+static USAGE_TEXT: &'static str =
+    include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", "USAGE.md"));
+
 #[derive(Copy, Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
-pub enum SleepKind {
+pub enum SlumberKind {
     Fixed,
     Random,
 }
 
 #[derive(Default, Deserialize)]
 pub struct SleepQueryParams {
-    pub kind: Option<SleepKind>,
+    #[serde(rename = "type")]
+    pub kind: Option<SlumberKind>,
     pub min: Option<u64>,
     pub max: Option<u64>,
     #[serde(rename = "time")]
@@ -60,7 +64,7 @@ pub struct SleepQueryParams {
 
 struct SlumberConfig {
     id: Uuid,
-    kind: SleepKind,
+    kind: SlumberKind,
     min: Duration,
     max: Duration,
     duration: Duration,
@@ -73,7 +77,7 @@ impl SlumberConfig {
 
         Self {
             id: Uuid::new_v4(),
-            kind: SleepKind::Fixed,
+            kind: SlumberKind::Fixed,
             min,
             max,
             duration: SleepBounds::duration(req, &min, &max),
@@ -93,7 +97,7 @@ impl SlumberConfig {
 
         Self {
             id: Uuid::new_v4(),
-            kind: SleepKind::Random,
+            kind: SlumberKind::Random,
             min,
             max,
             duration: thread_rng().gen_range(min, max),
@@ -143,6 +147,7 @@ impl SleepBounds {
 /// The response type returned by slumber requests.
 type SlumberFuture = Box<dyn Future<Item = HttpResponse, Error = Error>>;
 
+/// The default handler for non-specific path-based requests.
 pub fn default(
     req: HttpRequest,
     data: Data<CliArgs>,
@@ -156,11 +161,23 @@ pub fn default(
     );
 
     slumber(match kind {
-        SleepKind::Random => SlumberConfig::random(&min, &max, &data),
-        SleepKind::Fixed => {
+        SlumberKind::Random => SlumberConfig::random(&min, &max, &data),
+        SlumberKind::Fixed => {
             SlumberConfig::fixed(&extract_sleep_time(req.headers(), &query, &data), &data)
         }
     })
+}
+
+/// Handler for returning usage information at runtime.
+pub fn help(data: Data<CliArgs>) -> HttpResponse {
+    if data.disable_help {
+        // return a 403 if help is disabled
+        HttpResponse::build(StatusCode::from_u16(403).unwrap()).finish()
+    } else {
+        HttpResponse::build(StatusCode::from_u16(200).unwrap())
+            .content_type("text/markdown")
+            .body(USAGE_TEXT)
+    }
 }
 
 /// Extract a duration using a query string value, header value, or the default value in that priority.
@@ -183,11 +200,11 @@ fn extract_sleep_kind(
     headers: &HeaderMap,
     query: &SleepQueryParams,
     config: &CliArgs,
-) -> SleepKind {
+) -> SlumberKind {
     let default = if config.random {
-        SleepKind::Random
+        SlumberKind::Random
     } else {
-        SleepKind::Fixed
+        SlumberKind::Fixed
     };
 
     query.kind.unwrap_or(
@@ -196,8 +213,8 @@ fn extract_sleep_kind(
             .map(|h| h.to_str())
             .and_then(|r| r.ok())
             .map(|s| match s {
-                "fixed" => SleepKind::Fixed,
-                "random" => SleepKind::Random,
+                "fixed" => SlumberKind::Fixed,
+                "random" => SlumberKind::Random,
                 _ => default,
             })
             .unwrap_or(default),
@@ -299,11 +316,11 @@ fn slumber(config: SlumberConfig) -> Box<dyn Future<Item = HttpResponse, Error =
 
                 // generate json response
                 let payload = match config.kind {
-                    SleepKind::Fixed => {
-                        SleepResponse::builder(&config.id, config.kind, &config.duration).build()
+                    SlumberKind::Fixed => {
+                        SlumberResponse::builder(&config.id, config.kind, &config.duration).build()
                     }
-                    SleepKind::Random => {
-                        SleepResponse::builder(&config.id, config.kind, &config.duration)
+                    SlumberKind::Random => {
+                        SlumberResponse::builder(&config.id, config.kind, &config.duration)
                             .min(&config.min)
                             .max(&config.max)
                             .build()
@@ -322,7 +339,7 @@ fn slumber(config: SlumberConfig) -> Box<dyn Future<Item = HttpResponse, Error =
                     );
 
                 match &payload.duration.kind {
-                    SleepKind::Random => {
+                    SlumberKind::Random => {
                         response.header(SLEEP_KIND_HEADER, "random");
                         response.header(MINIMUM_SLEEP_TIME_HEADER, format!("{:?}", config.min));
                         response.header(
@@ -335,7 +352,7 @@ fn slumber(config: SlumberConfig) -> Box<dyn Future<Item = HttpResponse, Error =
                             format!("{}", config.max.as_millis()),
                         );
                     }
-                    SleepKind::Fixed => {
+                    SlumberKind::Fixed => {
                         response.header(SLEEP_KIND_HEADER, "fixed");
                     }
                 };

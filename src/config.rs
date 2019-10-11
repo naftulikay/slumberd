@@ -1,12 +1,13 @@
+use std::default::Default;
 use std::time::Duration;
 
 use structopt::StructOpt;
 
+/// An HTTP server which sleeps for a specific or random amount of time.
+///
+/// Usage information is available over HTTP at /_help or /_usage; use --disable-help to disable this endpoint.
 #[derive(StructOpt)]
-#[structopt(
-    name = "slumberd",
-    about = "An HTTP service for slowly serving HTTP responses."
-)]
+#[structopt(name = "slumberd")]
 pub struct CliArgs {
     /// The amount of time to sleep in milliseconds on each request by default. This value is ignored in random mode.
     #[structopt(short = "s", long = "sleep", default_value = "5000")]
@@ -36,6 +37,10 @@ pub struct CliArgs {
     /// verbosity to DEBUG, twice for TRACE.
     #[structopt(short = "v", parse(from_occurrences))]
     pub verbosity: u64,
+    /// Disable serving usage information at /_help and /_usage. These endpoints will otherwise serve markdown usage
+    /// information from USAGE.md which is compiled into in the binary.
+    #[structopt(long = "disable-help")]
+    pub disable_help: bool,
 }
 
 impl CliArgs {
@@ -68,5 +73,22 @@ impl CliArgs {
         );
 
         max.max(min)
+    }
+}
+
+impl Default for CliArgs {
+    fn default() -> Self {
+        // FIXME this is duplicated code due to default structopt values listed above, not sure how to combat this
+        Self {
+            sleep_ms: 5000,
+            host: "127.0.0.1".to_string(),
+            json: false,
+            min_sleep_ms: 15,
+            max_sleep_ms: 30000,
+            port: 8080,
+            verbosity: 0,
+            disable_help: false,
+            random: false,
+        }
     }
 }
